@@ -1,0 +1,28 @@
+# Normal (non-fraud) transaction generation profile.
+# Amounts are modeled as a bounded log-normal distribution — this produces
+# realistic "many small purchases, few large ones" spend patterns.
+
+amount:
+  mu: 4.0        # ln(mean) → e^4.0 ≈ $54 typical purchase
+  sigma: 0.9
+  min: 1.00
+  max: 5000.00
+
+channel_weights:
+  online: 0.45
+  pos: 0.35
+  mobile: 0.15
+  atm: 0.05
+
+transaction_type_weights:
+  purchase: 0.85
+  withdrawal: 0.08
+  transfer: 0.05
+  refund: 0.02
+
+time_of_day:
+  # Relative weight per hour bucket, used by the TPS scheduler to shape
+  # diurnal traffic instead of pure uniform arrival.
+  peak_hours: [11, 12, 13, 18, 19, 20]
+  peak_weight: 2.5
+  off_peak_weight: 1.0

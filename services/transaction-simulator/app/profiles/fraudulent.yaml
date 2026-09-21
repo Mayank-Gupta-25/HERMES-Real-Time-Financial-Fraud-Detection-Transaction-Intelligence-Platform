@@ -1,0 +1,33 @@
+# Fraud scenario definitions, consumed by fraud_patterns.py.
+# fraud_rate is the fraction of generated customers per batch that get a
+# fraud burst injected instead of a single normal transaction. Because a
+# burst produces multiple transactions, the actual share of fraud-labeled
+# transactions in the output stream ends up somewhat higher than fraud_rate.
+
+fraud_rate: 0.05
+
+patterns:
+  velocity_abuse:
+    weight: 0.35
+    min_txns: 5
+    max_txns: 10
+    window_seconds: 60
+
+  geo_impossible:
+    weight: 0.25
+    min_gap_minutes: 2
+    max_gap_minutes: 20
+    min_distance_km: 3000
+
+  card_testing:
+    weight: 0.25
+    min_txns: 6
+    max_txns: 15
+    max_amount: 5.00
+
+  structuring:
+    weight: 0.15
+    reporting_threshold: 10000
+    min_txns: 3
+    max_txns: 5
+    pct_of_threshold: [0.90, 0.99]
