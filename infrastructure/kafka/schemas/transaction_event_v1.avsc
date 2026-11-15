@@ -1,0 +1,51 @@
+{
+  "type": "record",
+  "name": "TransactionEvent",
+  "namespace": "io.hermes.events",
+  "doc": "Canonical HERMES operational transaction event granule (Lab 6-7-8 Section 4)",
+  "fields": [
+    {"name": "event_id", "type": "string", "doc": "UUIDv4 unique event identifier (deduplication key)"},
+    {"name": "event_time", "type": "string", "doc": "UTC ISO-8601 timestamp (e.g. 2026-11-12T14:30:00.123456Z)"},
+    {"name": "customer_id", "type": "string", "doc": "UUIDv4 customer identifier (Kafka partition key)"},
+    {"name": "merchant_id", "type": "string", "doc": "UUIDv4 merchant identifier"},
+    {"name": "amount", "type": "double", "doc": "Positive transaction amount (> 0.0)"},
+    {"name": "currency", "type": "string", "default": "USD", "doc": "ISO 4217 3-letter uppercase currency code"},
+    {"name": "transaction_type", "type": "string", "default": "purchase", "doc": "purchase | withdrawal | transfer | refund"},
+    {"name": "channel", "type": "string", "default": "online", "doc": "online | pos | atm | mobile"},
+    {"name": "card_type", "type": "string", "default": "credit", "doc": "credit | debit | prepaid"},
+    {"name": "category", "type": "string", "doc": "Canonical merchant category (e.g. electronics, groceries, gambling)"},
+    {
+      "name": "location",
+      "type": {
+        "type": "record",
+        "name": "LocationRecord",
+        "fields": [
+          {"name": "country", "type": "string", "doc": "ISO 3166-1 alpha-2 uppercase country code"},
+          {"name": "city", "type": "string"},
+          {"name": "latitude", "type": "double", "doc": "Range [-90.0, 90.0]"},
+          {"name": "longitude", "type": "double", "doc": "Range [-180.0, 180.0]"}
+        ]
+      }
+    },
+    {
+      "name": "device",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "DeviceRecord",
+          "fields": [
+            {"name": "device_id", "type": ["null", "string"], "default": null},
+            {"name": "ip_address", "type": ["null", "string"], "default": null},
+            {"name": "device_type", "type": "string", "default": "mobile", "doc": "mobile | desktop | tablet | atm | pos_terminal"},
+            {"name": "os", "type": ["null", "string"], "default": null}
+          ]
+        }
+      ],
+      "default": null
+    },
+    {"name": "is_international", "type": "boolean", "default": false},
+    {"name": "status", "type": "string", "default": "pending", "doc": "pending | completed | declined | flagged"},
+    {"name": "schema_version", "type": "string", "default": "1.0", "doc": "Semantic contract version"}
+  ]
+}

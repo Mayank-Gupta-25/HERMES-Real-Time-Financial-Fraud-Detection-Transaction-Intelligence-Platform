@@ -1,0 +1,55 @@
+{
+  "uid": "hermes-kafka-stream-metrics",
+  "title": "HERMES Kafka Ingestion, Cleaning & Flink Stream Metrics",
+  "tags": ["hermes", "kafka", "flink", "dlq", "MOD-08"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Ingestion Boundary Events by Source & Status",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(hermes_transactions_ingested_total[1m])) by (source, status)",
+          "legendFormat": "{{source}} ({{status}})"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Deterministic Stream Cleaning & Deduplication Outcomes",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(hermes_cleaning_events_total[1m])) by (outcome)",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "DLQ Rejections by Canonical Reason Code",
+      "type": "barchart",
+      "targets": [
+        {
+          "expr": "sum(hermes_cleaning_events_total{outcome=\"dlq_rejected\"}) by (reason_code)",
+          "legendFormat": "{{reason_code}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Flink Operator Throughput (events/sec)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(hermes_flink_events_processed_total[1m])) by (operator, status)",
+          "legendFormat": "{{operator}} ({{status}})"
+        }
+      ]
+    }
+  ]
+}

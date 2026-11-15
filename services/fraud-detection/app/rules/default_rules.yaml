@@ -1,0 +1,122 @@
+rule_version: "rules-v1.0"
+description: "HERMES deterministic 10-rule fraud detection catalog (Section 10.B & 11.2)"
+
+rules:
+  - id: "R01"
+    name: "VELOCITY_EXCEEDED"
+    enabled: true
+    weight: 0.45
+    severity: "high"
+    action: "flag"
+    description: "Transaction velocity exceeds 10 txns in 1h or 5 txns in 5m"
+    conditions:
+      txn_count_1h_gt: 10
+      txn_count_5m_gte: 5
+
+  - id: "R02"
+    name: "AMOUNT_SPIKE"
+    enabled: true
+    weight: 0.35
+    severity: "medium"
+    action: "flag"
+    description: "Transaction amount z-score exceeds 3.0 above prior customer baseline (> $500) outside warmup"
+    conditions:
+      require_not_warmup: true
+      amount_z_score_gt: 3.0
+      amount_gt: 500.0
+
+  - id: "R03"
+    name: "GEO_IMPOSSIBILITY"
+    enabled: true
+    weight: 0.65
+    severity: "critical"
+    action: "block"
+    description: "Implied travel speed exceeds 800 km/h over a distance > 100 km"
+    conditions:
+      travel_speed_kmph_gt: 800.0
+      geo_distance_km_gt: 100.0
+
+  - id: "R04"
+    name: "CARD_TESTING"
+    enabled: true
+    weight: 0.55
+    severity: "high"
+    action: "flag"
+    description: "Rapid micro-transaction probing (>=3 micro txns in 10m followed by >=$100, or >=4 micro txns in 5m)"
+    conditions:
+      micro_txn_count_10m_gte: 3
+      followup_amount_gte: 100.0
+      burst_txn_count_5m_gte: 4
+      micro_amount_lte: 5.0
+
+  - id: "R05"
+    name: "HIGH_RISK_MERCHANT"
+    enabled: true
+    weight: 0.25
+    severity: "medium"
+    action: "flag"
+    description: "High-risk merchant flag or high-risk category (gambling, crypto, money_transfer, jewelry) with amount > $2000"
+    conditions:
+      high_risk_categories:
+        - "gambling"
+        - "crypto"
+        - "money_transfer"
+        - "jewelry"
+      category_amount_gt: 2000.0
+
+  - id: "R06"
+    name: "UNUSUAL_HOUR"
+    enabled: true
+    weight: 0.20
+    severity: "low"
+    action: "flag"
+    description: "High-value transaction (> $1000) occurring during unusual overnight hours (01:00-04:59 UTC)"
+    conditions:
+      unusual_hours: [1, 2, 3, 4]
+      amount_gt: 1000.0
+
+  - id: "R07"
+    name: "NEW_DEVICE_HIGH_AMOUNT"
+    enabled: true
+    weight: 0.35
+    severity: "medium"
+    action: "flag"
+    description: "Device change detected on transaction with amount > $1000"
+    conditions:
+      device_change_flag_eq: 1
+      amount_gt: 1000.0
+
+  - id: "R08"
+    name: "RAPID_SUCCESSION"
+    enabled: true
+    weight: 0.30
+    severity: "medium"
+    action: "flag"
+    description: "Back-to-back transactions within 30 seconds with >= 2 txns in 1 minute"
+    conditions:
+      time_since_last_sec_lt: 30.0
+      txn_count_1m_gte: 2
+
+  - id: "R09"
+    name: "INTERNATIONAL_HIGH_AMOUNT"
+    enabled: true
+    weight: 0.40
+    severity: "high"
+    action: "flag"
+    description: "Cross-border transaction with amount > $2500"
+    conditions:
+      is_international_eq: 1
+      amount_gt: 2500.0
+
+  - id: "R10"
+    name: "STRUCTURING"
+    enabled: true
+    weight: 0.60
+    severity: "critical"
+    action: "block"
+    description: "AML structuring transaction in [$8,000, $10,000) with repeated structuring or 1h sum >= $16,000"
+    conditions:
+      amount_gte: 8000.0
+      amount_lt: 10000.0
+      structuring_txn_count_24h_gte: 2
+      amount_sum_1h_gte: 16000.0

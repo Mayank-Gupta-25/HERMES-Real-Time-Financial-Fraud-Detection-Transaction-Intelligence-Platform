@@ -4,6 +4,7 @@ Module 4/5 — Synthetic Customer Profile Generator
 Produces realistic customer profiles that the transaction generator uses as
 the "identity" side of every transaction: home location, typical spend,
 preferred categories, and risk tier.
+Includes a deterministic stdlib fallback when `faker` is not installed.
 """
 from __future__ import annotations
 
@@ -15,9 +16,33 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List
 
-from faker import Faker
+try:
+    from faker import Faker
 
-fake = Faker()
+    fake = Faker()
+except ImportError:
+    _FIRST_NAMES = [
+        "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Sai", "Reyansh", "Ayaan",
+        "Emma", "Olivia", "Ava", "Isabella", "Sophia", "Mia", "Charlotte", "Amelia",
+        "Liam", "Noah", "Oliver", "Elijah", "Lucas", "Mason", "Logan", "Ethan",
+    ]
+    _LAST_NAMES = [
+        "Sharma", "Verma", "Gupta", "Patel", "Kumar", "Singh", "Sinha", "Mehta",
+        "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
+    ]
+    _DOMAINS = ["example.com", "hermespay.io", "finbank.org", "globalmail.net"]
+
+    class _FallbackFaker:
+        def name(self) -> str:
+            return f"{random.choice(_FIRST_NAMES)} {random.choice(_LAST_NAMES)}"
+
+        def email(self) -> str:
+            first = random.choice(_FIRST_NAMES).lower()
+            last = random.choice(_LAST_NAMES).lower()
+            num = random.randint(10, 9999)
+            return f"{first}.{last}{num}@{random.choice(_DOMAINS)}"
+
+    fake = _FallbackFaker()  # type: ignore[assignment]
 
 RISK_TIERS = ["low", "medium", "high"]
 RISK_WEIGHTS = [0.80, 0.15, 0.05]
@@ -77,7 +102,7 @@ def generate_customer() -> Customer:
         home_city=region["city"],
         home_latitude=round(region["lat"] + random.uniform(-0.05, 0.05), 6),
         home_longitude=round(region["lon"] + random.uniform(-0.05, 0.05), 6),
-        account_created_at=created.isoformat(),
+        account_created_at=created.isoformat().replace("+00:00", "Z"),
         risk_tier=random.choices(RISK_TIERS, weights=RISK_WEIGHTS, k=1)[0],
         preferred_categories=random.sample(SPENDING_CATEGORIES, k=random.randint(2, 4)),
         avg_transaction_amount=round(random.lognormvariate(mu=4.0, sigma=0.8), 2),

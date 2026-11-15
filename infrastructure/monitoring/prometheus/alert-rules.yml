@@ -1,0 +1,43 @@
+groups:
+  - name: hermes_sla_and_fraud_alerts
+    interval: 5s
+    rules:
+      - alert: HighEndToEndLatency
+        expr: histogram_quantile(0.99, sum(rate(hermes_e2e_latency_ms_bucket[1m])) by (le)) > 500
+        for: 1m
+        labels:
+          severity: critical
+          module: MOD-08
+        annotations:
+          summary: "HERMES End-to-End p99 latency exceeded 500ms SLA"
+          description: "Measured p99 end-to-end latency is {{ $value }}ms (target < 500ms)."
+
+      - alert: HighScoringLatency
+        expr: histogram_quantile(0.99, sum(rate(hermes_scoring_latency_ms_bucket[1m])) by (le)) > 50
+        for: 1m
+        labels:
+          severity: warning
+          module: MOD-04
+        annotations:
+          summary: "HERMES Fraud Scoring p99 latency exceeded 50ms SLA"
+          description: "Measured p99 /score inference latency is {{ $value }}ms (target < 50ms)."
+
+      - alert: ElevatedDLQRate
+        expr: rate(hermes_cleaning_events_total{outcome="dlq_rejected"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          module: MOD-01
+        annotations:
+          summary: "Elevated invalid-event rejection rate to hermes.dlq"
+          description: "DLQ rejection rate exceeded 10 events/sec over 5m."
+
+      - alert: FraudSpikeDetected
+        expr: sum(rate(hermes_fraud_score_distribution_count{decision="block"}[5m])) / sum(rate(hermes_fraud_score_distribution_count[5m])) > 0.10
+        for: 2m
+        labels:
+          severity: critical
+          module: MOD-04
+        annotations:
+          summary: "Critical fraud block rate exceeded 10% of total traffic"
+          description: "Block decision ratio over the last 5m exceeded 10%."

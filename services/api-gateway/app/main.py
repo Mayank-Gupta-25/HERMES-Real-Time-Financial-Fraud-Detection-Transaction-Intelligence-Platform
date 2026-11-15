@@ -13,7 +13,10 @@ from .config import settings
 from .middleware.auth import JWTAuthMiddleware
 from .middleware.logging import CorrelationIdLoggingMiddleware
 from .middleware.rate_limiter import RedisRateLimiterMiddleware
+from .middleware.telemetry import OpenTelemetryTraceMiddleware, enable_windows_sandbox_iocp_wakeup
 from .models.response import DLQErrorResponse
+
+enable_windows_sandbox_iocp_wakeup()
 from .routes.health import API_REQUEST_DURATION_MS, TRANSACTIONS_INGESTED_TOTAL, router as health_router
 from .routes.transactions import router as transactions_router
 from .services.kafka_producer import GatewayKafkaProducer, get_kafka_producer
@@ -67,10 +70,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Register middlewares (outermost executes first: CorrelationIdLogging -> JWTAuth -> RateLimiter)
+# Register middlewares (outermost executes first: OpenTelemetryTrace -> CorrelationIdLogging -> JWTAuth -> RateLimiter)
 app.add_middleware(RedisRateLimiterMiddleware)
 app.add_middleware(JWTAuthMiddleware)
 app.add_middleware(CorrelationIdLoggingMiddleware)
+app.add_middleware(OpenTelemetryTraceMiddleware, service_name=settings.service_name)
 
 
 @app.middleware("http")

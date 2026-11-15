@@ -1,0 +1,33 @@
+{
+  "weights_version": "weights-v1.0",
+  "alpha_rule": 0.4,
+  "beta_ml": 0.45,
+  "gamma_stat": 0.15,
+  "fallback_alpha_rule": 0.65,
+  "fallback_gamma_stat": 0.35,
+  "thresholds": {
+    "low_max": 0.4,
+    "medium_max": 0.65,
+    "high_max": 0.85
+  },
+  "warmup_min_events": 5,
+  "target_recall": 0.85,
+  "calibration_summary": {
+    "calibrated_at": "2026-11-15T17:08:57.222710Z",
+    "split_policy": "chronological_70_15_15",
+    "grid_candidates_evaluated": 47,
+    "validation_metrics": {
+      "recall": 1.0,
+      "precision": 1.0,
+      "f1_score": 1.0,
+      "false_positive_rate": 0.0
+    },
+    "test_metrics": {
+      "auc_roc": 1.0,
+      "recall": 1.0,
+      "precision": 1.0,
+      "f1_score": 1.0,
+      "false_positive_rate": 0.0
+    }
+  }
+}

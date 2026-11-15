@@ -3,6 +3,7 @@ Module 4/5 — Synthetic Merchant Profile Generator
 
 Produces realistic merchant profiles (name, MCC-style category, location,
 typical ticket size) used as the counterparty side of every transaction.
+Includes a deterministic stdlib fallback when `faker` is not installed.
 """
 from __future__ import annotations
 
@@ -13,9 +14,25 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import List
 
-from faker import Faker
+try:
+    from faker import Faker
 
-fake = Faker()
+    fake = Faker()
+except ImportError:
+    _COMPANY_PREFIXES = [
+        "Apex", "Vertex", "Nova", "Global", "Metro", "Prime", "Horizon", "Summit",
+        "Stellar", "Omni", "Pacific", "Atlantic", "Vanguard", "Nexus", "Orion",
+    ]
+    _COMPANY_SUFFIXES = [
+        "Mart", "Retail", "Electronics", "Holdings", "Commerce", "Services",
+        "Group", "Solutions", "Trading", "Exchange", "Ventures", "Logistics",
+    ]
+
+    class _FallbackMerchantFaker:
+        def company(self) -> str:
+            return f"{random.choice(_COMPANY_PREFIXES)} {random.choice(_COMPANY_SUFFIXES)}"
+
+    fake = _FallbackMerchantFaker()  # type: ignore[assignment]
 
 MERCHANT_CATEGORIES = [
     "electronics", "groceries", "dining", "travel", "entertainment",

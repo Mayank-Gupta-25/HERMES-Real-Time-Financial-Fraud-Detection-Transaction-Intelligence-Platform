@@ -1,0 +1,63 @@
+{
+  "uid": "hermes-system-overview",
+  "title": "HERMES System Overview & SLA Telemetry",
+  "tags": ["hermes", "system", "sla", "MOD-08"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Transaction Ingestion Throughput (TPS)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(hermes_transactions_ingested_total{status=\"valid\"}[1m]))",
+          "legendFormat": "Valid Ingestion TPS"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "End-to-End Pipeline Latency (p50 / p95 / p99 ms)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(hermes_e2e_latency_ms_bucket[1m])) by (le))",
+          "legendFormat": "p50 E2E ms"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(hermes_e2e_latency_ms_bucket[1m])) by (le))",
+          "legendFormat": "p95 E2E ms"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(hermes_e2e_latency_ms_bucket[1m])) by (le))",
+          "legendFormat": "p99 E2E ms"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "HTTP API Request Duration by Service (p95 ms)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(hermes_api_request_duration_ms_bucket[1m])) by (le, service))",
+          "legendFormat": "{{service}} p95"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Latest Flink Checkpoint Duration (ms)",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "hermes_flink_last_checkpoint_duration_ms",
+          "legendFormat": "{{job_name}}"
+        }
+      ]
+    }
+  ]
+}

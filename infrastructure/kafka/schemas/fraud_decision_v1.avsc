@@ -1,0 +1,88 @@
+{
+  "type": "record",
+  "name": "FraudDecision",
+  "namespace": "io.hermes.events",
+  "doc": "Canonical HERMES fraud decision and provenance contract (Lab 6-7-8 Section 4 & 6)",
+  "fields": [
+    {"name": "event_id", "type": "string", "doc": "UUIDv4 unique event identifier"},
+    {"name": "transaction_id", "type": ["null", "string"], "default": null, "doc": "Backward-compatible alias for event_id"},
+    {"name": "event_time", "type": "string", "doc": "UTC ISO-8601 event timestamp"},
+    {"name": "customer_id", "type": "string", "doc": "UUIDv4 customer identifier"},
+    {"name": "merchant_id", "type": "string", "doc": "UUIDv4 merchant identifier"},
+    {"name": "amount", "type": "double", "doc": "Transaction amount (> 0.0)"},
+    {"name": "currency", "type": "string", "default": "USD"},
+    {"name": "channel", "type": "string", "default": "online"},
+    {"name": "category", "type": "string"},
+    {
+      "name": "location",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "DecisionLocationRecord",
+          "fields": [
+            {"name": "country", "type": "string"},
+            {"name": "city", "type": "string"},
+            {"name": "latitude", "type": "double"},
+            {"name": "longitude", "type": "double"}
+          ]
+        }
+      ],
+      "default": null
+    },
+    {"name": "fraud_score", "type": "double", "doc": "Calibrated hybrid fraud score in [0.0, 1.0]"},
+    {"name": "rule_score", "type": "double", "default": 0.0},
+    {"name": "ml_score", "type": "double", "default": 0.0},
+    {"name": "z_score_signal", "type": ["null", "double"], "default": null},
+    {"name": "stat_score", "type": ["null", "double"], "default": null},
+    {"name": "risk_band", "type": "string", "doc": "low | medium | high | critical"},
+    {"name": "risk_level", "type": ["null", "string"], "default": null, "doc": "UI compatibility alias for risk_band"},
+    {"name": "decision", "type": "string", "doc": "approve | flag | block"},
+    {
+      "name": "triggered_rules",
+      "type": {"type": "array", "items": "string"},
+      "default": []
+    },
+    {
+      "name": "reasons",
+      "type": {"type": "array", "items": "string"},
+      "default": []
+    },
+    {"name": "model_version", "type": "string", "default": "xgboost-v1.0.0"},
+    {"name": "shadow_model_version", "type": ["null", "string"], "default": null},
+    {"name": "shadow_ml_score", "type": ["null", "double"], "default": null},
+    {"name": "rule_version", "type": "string", "default": "rules-v1.0.0"},
+    {"name": "transformation_version", "type": "string", "default": "features-v1.0.0"},
+    {"name": "schema_version", "type": "string", "default": "1.0"},
+    {"name": "feature_time", "type": ["null", "string"], "default": null},
+    {"name": "decision_time", "type": "string"},
+    {"name": "processing_time_ms", "type": ["null", "long"], "default": null},
+    {
+      "name": "feature_values",
+      "type": {"type": "map", "values": ["null", "double", "long", "boolean", "string"]},
+      "default": {}
+    },
+    {
+      "name": "provenance",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "ProvenanceRecord",
+          "fields": [
+            {"name": "source_topic", "type": "string", "default": "hermes.transactions.raw"},
+            {"name": "partition", "type": ["null", "int"], "default": null},
+            {"name": "offset", "type": ["null", "long"], "default": null},
+            {"name": "ingestion_time", "type": ["null", "string"], "default": null},
+            {
+              "name": "storage_destinations",
+              "type": {"type": "array", "items": "string"},
+              "default": []
+            }
+          ]
+        }
+      ],
+      "default": null
+    }
+  ]
+}
