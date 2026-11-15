@@ -1,0 +1,305 @@
+name: hermes
+
+x-python-service: &python-service
+  restart: unless-stopped
+  networks: [hermes-net]
+  environment: &python-environment
+    KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+    KAFKA_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REDIS_DB: ${REDIS_DB:-0}
+    JWT_SECRET_KEY: ${JWT_SECRET_KEY:-hermes-dev-secret-key-change-in-prod}
+    JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+    JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+    FRAUD_SERVICE_URL: ${FRAUD_SERVICE_URL:-http://fraud-detection:8000}
+  depends_on:
+    kafka-init:
+      condition: service_completed_successfully
+    schema-registry:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports:
+      - "9092:29092"
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_HEAP_OPTS: -Xms512M -Xmx768M
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "kafka-topics --bootstrap-server kafka:9092 --list >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.1
+    networks: [hermes-net]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    volumes:
+      - ./infrastructure/kafka/topics-init.sh:/init/topics-init.sh:ro
+    entrypoint: ["bash", "/init/topics-init.sh"]
+    restart: "no"
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    hostname: schema-registry
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports:
+      - "${SCHEMA_REGISTRY_PORT:-8081}:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "curl -fsS http://localhost:8081/subjects >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports: ["6379:6379"]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hermes_ops}
+      POSTGRES_USER: ${POSTGRES_USER:-hermes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hermes_dev_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  timescaledb:
+    image: timescale/timescaledb:2.14.2-pg16
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports: ["5433:5432"]
+    environment:
+      POSTGRES_DB: ${TIMESCALE_DB:-hermes_metrics}
+      POSTGRES_USER: ${TIMESCALE_USER:-hermes}
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD:-hermes_dev_pass}
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-hermes_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASS:-hermes_minio_pass}
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes: [minio_data:/data]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    networks: [hermes-net]
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["mc alias set hermes http://minio:9000 '$${MINIO_ROOT_USER}' '$${MINIO_ROOT_PASSWORD}' && mc mb --ignore-existing hermes/$${MINIO_BUCKET}"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-hermes_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASS:-hermes_minio_pass}
+      MINIO_BUCKET: ${MINIO_BUCKET:-hermes-archive}
+    restart: "no"
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports:
+      - "16686:16686"
+      - "6831:6831/udp"
+      - "4317:4317"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:14269/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports: ["9090:9090"]
+    command: ["--config.file=/dev/null", "--storage.tsdb.path=/prometheus"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports: ["3001:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-hermes_grafana_dev}
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  api-gateway:
+    <<: *python-service
+    build: ./services/api-gateway
+    ports: ["8000:8000"]
+    environment:
+      <<: *python-environment
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  fraud-detection:
+    <<: *python-service
+    build: ./services/fraud-detection
+    ports: ["8001:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  analytics-service:
+    <<: *python-service
+    build: ./services/analytics-service
+    ports: ["8003:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  notification-service:
+    <<: *python-service
+    build: ./services/notification-service
+    ports: ["8004:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=2)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  transaction-processor:
+    <<: *python-service
+    build: ./services/transaction-processor
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  transaction-simulator:
+    build: ./services/transaction-simulator
+    profiles: [simulator]
+    networks: [hermes-net]
+    environment:
+      SIMULATOR_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      SIMULATOR_KAFKA_TOPIC: hermes.transactions.raw
+      SIMULATOR_DEFAULT_TPS: ${SIMULATOR_DEFAULT_TPS:-1000}
+      SIMULATOR_DEFAULT_FRAUD_RATE: ${SIMULATOR_DEFAULT_FRAUD_RATE:-0.05}
+      SIMULATOR_NUM_CUSTOMERS: ${SIMULATOR_NUM_CUSTOMERS:-10000}
+      SIMULATOR_NUM_MERCHANTS: ${SIMULATOR_NUM_MERCHANTS:-5000}
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+
+  dashboard:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    networks: [hermes-net]
+    ports: ["3000:80"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+networks:
+  hermes-net:
+    driver: bridge
+
+volumes:
+  kafka_data:
+  postgres_data:
+  timescale_data:
+  redis_data:
+  minio_data:
+  flink_checkpoints:
